@@ -19,9 +19,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+RUN mkdir -p /app/data && chmod 755 /app/data
+RUN mkdir -p /data && chmod 755 /data
+
+# Preload the InsightFace model during build
+RUN python preload_model.py
+
 EXPOSE 5000
 
 HEALTHCHECK --start-period=60s --interval=10s --timeout=5s --retries=3 \
   CMD curl -f http://localhost:5000/api/health || exit 1
 
-CMD ["python", "app.py"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "2", "app:application"]

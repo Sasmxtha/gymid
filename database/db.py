@@ -4,7 +4,10 @@ from datetime import datetime, date
 from typing import Optional, Dict, List, Any
 
 log     = logging.getLogger("gymid.db")
-DEFAULT_DB_PATH = os.path.join(os.sep, "data", "gymid.db")
+project_id = os.environ.get("RAILWAY_PROJECT_ID", "f1d45b1f-f925-4005-9381-1ac35c3509da")
+volume_name = os.environ.get("RAILWAY_VOLUME_NAME", "vol_3cygu5nc1sov070u")
+mount_path = os.path.join("/var/lib/containers/railwayapp/bind-mounts", project_id, volume_name)
+DEFAULT_DB_PATH = os.path.join(mount_path, "gymid.db")
 DB_PATH = os.environ.get("DB_PATH", "")
 if not DB_PATH or not DB_PATH.strip():
     DB_PATH = DEFAULT_DB_PATH
@@ -23,7 +26,10 @@ class Database:
     def _conn(self):
         c = sqlite3.connect(self.path, check_same_thread=False)
         c.row_factory = sqlite3.Row
-        c.execute("PRAGMA journal_mode=WAL")
+        try:
+            c.execute("PRAGMA journal_mode=WAL")
+        except sqlite3.OperationalError:
+            c.execute("PRAGMA journal_mode=DELETE")
         c.execute("PRAGMA foreign_keys=ON")
         return c
 

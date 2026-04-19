@@ -19,7 +19,7 @@ class FaceEngine:
 
     def _init(self):
         # ── Ensure persistent model cache directory exists ──
-        model_root = "/data/insightface_models"
+        model_root = os.path.join(os.path.dirname(__file__), 'models_cache')
         os.makedirs(model_root, exist_ok=True)
         log.info(f"InsightFace model cache directory: {model_root}")
 
@@ -44,16 +44,6 @@ class FaceEngine:
             except Exception as e:
                 log.warning(f"{model_name} failed: {e}")
 
-        # ── Fallback: face_recognition (dlib) ──
-        try:
-            import face_recognition
-            self._model  = "face_recognition"
-            self.backend = "face_recognition"
-            log.info("✅ Face engine: face_recognition (dlib)")
-            return
-        except Exception as e:
-            log.warning(f"face_recognition failed: {e}")
-
         # ── Last resort: OpenCV Haar ──
         import cv2
         self._model  = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
@@ -71,8 +61,6 @@ class FaceEngine:
         try:
             if self.backend in ("buffalo_l", "buffalo_sc"):
                 return self._embed_insightface(img_bgr)
-            elif self.backend == "face_recognition":
-                return self._embed_fr(img_bgr)
             else:
                 return self._embed_cv(img_bgr)
         except Exception as e:
@@ -114,12 +102,6 @@ class FaceEngine:
         )
         emb = faces[0].embedding.astype(np.float32)
         return self._norm(emb)
-
-    def _embed_fr(self, img: np.ndarray) -> Optional[np.ndarray]:
-        import face_recognition, cv2
-        rgb  = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        encs = face_recognition.face_encodings(rgb, model="large")
-        return self._norm(np.array(encs[0], dtype=np.float32)) if encs else None
 
     def _embed_cv(self, img: np.ndarray) -> Optional[np.ndarray]:
         import cv2

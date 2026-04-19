@@ -12,7 +12,6 @@ log = logging.getLogger("gymid.matcher")
 DEFAULTS = {
     "buffalo_l":        0.50,
     "buffalo_sc":       0.38,
-    "face_recognition": 0.36,
     "opencv_cascade":   0.45,
 }
 
