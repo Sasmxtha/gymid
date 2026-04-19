@@ -18,22 +18,28 @@ class FaceEngine:
         self._init()
 
     def _init(self):
+        # ── Ensure persistent model cache directory exists ──
+        model_root = "/data/insightface_models"
+        os.makedirs(model_root, exist_ok=True)
+        log.info(f"InsightFace model cache directory: {model_root}")
+
         # ── Try buffalo_l first (best accuracy, needs ~300MB download) ──
         for model_name in ["buffalo_l", "buffalo_sc"]:
             try:
                 from insightface.app import FaceAnalysis
-                log.info(f"Loading InsightFace {model_name}...")
+                log.info(f"Loading InsightFace {model_name} (root={model_root}) — this may take a moment on first run...")
                 app = FaceAnalysis(
                     name=model_name,
-                    root="/content/insightface_models",
+                    root=model_root,
                     providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
                 )
                 # buffalo_l works best at 640x640, buffalo_sc at 320x320
                 det_size = (640, 640) if model_name == "buffalo_l" else (320, 320)
+                log.info(f"Calling app.prepare() for {model_name} with det_size={det_size}...")
                 app.prepare(ctx_id=0, det_size=det_size)
                 self._model  = app
                 self.backend = model_name
-                log.info(f"✅ Face engine: {model_name} (det_size={det_size})")
+                log.info(f"✅ Face engine ready: {model_name} (det_size={det_size})")
                 return
             except Exception as e:
                 log.warning(f"{model_name} failed: {e}")
