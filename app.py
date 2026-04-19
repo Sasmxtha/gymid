@@ -24,10 +24,18 @@ application = Flask(__name__, static_folder=FRONTEND, static_url_path="") # Chan
 CORS(application, resources={r"/api/*": {"origins": "*"}})
 app = application # Alias for compatibility
 
-db          = Database()
-face_engine = FaceEngine()
-matcher     = FaceMatcher(backend=face_engine.backend)
-augmentor   = Augmentor()
+db = Database()
+
+log.info("Initialising FaceEngine — model download may occur on first run...")
+try:
+    face_engine = FaceEngine()
+    log.info(f"FaceEngine initialised successfully (backend={face_engine.backend})")
+except Exception as _fe_err:
+    log.critical(f"FaceEngine failed to initialise: {_fe_err}", exc_info=True)
+    raise SystemExit(1)
+
+matcher   = FaceMatcher(backend=face_engine.backend)
+augmentor = Augmentor()
 
 def decode_img(data_url):
     import cv2
@@ -217,4 +225,6 @@ def set_threshold():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+    log.info(f"Starting Flask on 0.0.0.0:{port}...")
+    print(f"Flask listening on 0.0.0.0:{port}", flush=True)
     app.run(host="0.0.0.0", port=port)
