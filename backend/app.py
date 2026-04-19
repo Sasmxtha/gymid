@@ -24,10 +24,49 @@ application = Flask(__name__, static_folder=FRONTEND, static_url_path="") # Chan
 CORS(application, resources={r"/api/*": {"origins": "*"}})
 app = application # Alias for compatibility
 
-db          = Database()
-face_engine = FaceEngine()
-matcher     = FaceMatcher(backend=face_engine.backend)
-augmentor   = Augmentor()
+db = Database()
+
+# Lazy-load heavy components
+_face_engine = None
+_matcher = None
+_augmentor = None
+_initialization_lock = __import__('threading').Lock()
+_initialization_error = None
+
+def get_face_engine():
+    """Lazy initialize face engine on first use."""
+    global _face_engine, _initialization_error
+    if _face_engine is not None:
+        return _face_engine
+    with _initialization_lock:
+        if _face_engine is not None:
+            return _face_engine
+        if _initialization_error:
+            raise _initialization_error
+        try:
+            log.info("Initialising FaceEngine — model download may occur on first run...")
+            _face_engine = FaceEngine()
+            log.info(f"FaceEngine initialised successfully (backend={_face_engine.backend})")
+            return _face_engine
+        except Exception as e:
+            _initialization_error = e
+            log.error(f"FaceEngine failed to initialise: {e}", exc_info=True)
+            raise
+
+def get_matcher():
+    """Lazy initialize matcher on first use."""
+    global _matcher
+    if _matcher is None:
+        engine = get_face_engine()
+        _matcher = FaceMatcher(backend=engine.backend)
+    return _matcher
+
+def get_augmentor():
+    """Lazy initialize augmentor on first use."""
+    global _augmentor
+    if _augmentor is None:
+        _augmentor = Augmentor()
+    return _augmentor
 
 def decode_img(data_url):
     import cv2

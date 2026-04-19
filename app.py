@@ -26,16 +26,55 @@ app = application # Alias for compatibility
 
 db = Database()
 
-log.info("Initialising FaceEngine — model download may occur on first run...")
-try:
-    face_engine = FaceEngine()
-    log.info(f"FaceEngine initialised successfully (backend={face_engine.backend})")
-except Exception as _fe_err:
-    log.critical(f"FaceEngine failed to initialise: {_fe_err}", exc_info=True)
-    raise SystemExit(1)
+# Lazy-load heavy components
+_face_engine = None
+_matcher = None
+_augmentor = None
+_initialization_lock = __import__('threading').Lock()
+_initialization_error = None
 
-matcher   = FaceMatcher(backend=face_engine.backend)
-augmentor = Augmentor()
+def get_face_engine():
+    """Lazy initialize face engine on first use."""
+    global _face_engine, _initialization_error
+    if _face_engine is not None:
+        return _face_engine
+    with _initialization_lock:
+        if _face_engine is not None:
+            return _face_engine
+        if _initialization_error:
+            raise _initialization_error
+        try:
+            log.info("Initialising FaceEngine — model download may occur on first run...")
+            _face_engine = FaceEngine()
+            log.info(f"FaceEngine initialised successfully (backend={_face_engine.backend})")
+            return _face_engine
+        except Exception as e:
+            _initialization_error = e
+            log.error(f"FaceEngine failed to initialise: {e}", exc_info=True)
+            raise
+
+def get_matcher():
+    """Lazy initialize matcher on first use."""
+    global _matcher
+    if _matcher is None:
+        engine = get_face_engine()
+        _matcher = FaceMatcher(backend=engine.backend)
+    return _matcher
+
+def get_augmentor():
+    """Lazy initialize augmentor on first use."""
+    global _augmentor
+    if _augmentor is None:
+        _augmentor = Augmentor()
+    return _augmentor
+
+# Alias for backwards compatibility
+def face_engine():
+    return get_face_engine()
+def matcher():
+    return get_matcher()
+def augmentor():
+    return get_augmentor()
 
 def decode_img(data_url):
     import cv2
@@ -50,11 +89,16 @@ def index(): return send_from_directory(FRONTEND, "index.html")
 # ── Health ────────────────────────────────────────────────────────────────────
 @application.route("/api/health")
 def health():
+    try:
+        engine_backend = get_face_engine().backend if _face_engine else "initializing"
+    except Exception as e:
+        engine_backend = f"error: {str(e)[:30]}"
+    
     return jsonify({
         "status": "ok",
         "members": db.count_members(),
-        "engine": face_engine.backend,
-        "threshold": matcher.threshold,
+        "engine": engine_backend,
+        "threshold": get_matcher().threshold if _face_engine else None,
         "timestamp": datetime.now().isoformat()
     })
 
@@ -77,10 +121,10 @@ def register():
         augmented = []
         for img in images:
             augmented.append(img)
-            augmented.extend(augmentor.augment(img, n=19))
+            augmented.extend(get_augmentor().augment(img, n=19))
 
         # Extract embeddings
-        embeddings = [e for e in (face_engine.extract_embedding(img) for img in augmented) if e is not None]
+        embeddings = [e for e in (get_face_engine().extract_embedding(img) for img in augmented) if e is not None]
         if len(embeddings) < 5:
             return jsonify({"error": "Could not detect face. Better lighting, no mask, face centred."}), 422
 
@@ -113,7 +157,7 @@ def detect():
         if img is None:
             return jsonify({"error": "Bad frame"}), 400
 
-        q_emb = face_engine.extract_embedding(img)
+        q_emb = get_face_engine().extract_embedding(img)
         if q_emb is None:
             return jsonify({"matched": False, "confidence": 0.0,
                             "message": "No face detected. Look at the camera."})
@@ -122,7 +166,7 @@ def detect():
         if not all_embs:
             return jsonify({"matched": False, "confidence": 0.0, "message": "No members registered."})
 
-        member_id, score, debug = matcher.match(q_emb, all_embs)
+        member_id, score, debug = get_matcher().match(q_emb, all_embs)
         log.info(f"Detect → {member_id} score={score:.3f} reason={debug.get('reason')}")
 
         if member_id:
@@ -138,7 +182,7 @@ def detect():
         reason = debug.get("reason", "")
         if "below_threshold" in reason:
             best = debug.get("best_weighted", 0)
-            thr  = debug.get("threshold", matcher.threshold)
+            thr  = debug.get("threshold", get_matcher().threshold)
             msg  = f"Not recognised ({best/thr*100:.0f}% of threshold)."
         elif "ambiguous" in reason:
             msg = "Ambiguous — try again."
@@ -175,7 +219,7 @@ def probe():
     try:
         body = request.get_json(force=True)
         img  = decode_img(body.get("frame", ""))
-        emb  = face_engine.extract_embedding(img) if img is not None else None
+        emb  = get_face_engine().extract_embedding(img) if img is not None else None
         if emb is None:
             return jsonify({"face_detected": False})
 
@@ -184,7 +228,7 @@ def probe():
         for mid, emb_list in all_embs.items():
             m    = db.get_member(mid)
             sims = sorted(
-                [float(np.dot(emb, matcher._norm(np.array(e, dtype=np.float32)))) for e in emb_list],
+                [float(np.dot(emb, get_matcher()._norm(np.array(e, dtype=np.float32)))) for e in emb_list],
                 reverse=True
             )
             top5     = sims[:5]
@@ -200,7 +244,7 @@ def probe():
         rec = round(results[0]["weighted"]*0.80, 3) if results else 0
         return jsonify({
             "face_detected": True,
-            "current_threshold": matcher.threshold,
+            "current_threshold": get_matcher().threshold,
             "scores": results,
             "recommended_threshold": rec,
             "note": "Recommended = 80% of your top score. Lower if you get false negatives."
