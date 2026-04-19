@@ -15,10 +15,12 @@ def _get_db_path():
     # Try RAILWAY_VOLUME_MOUNT_PATH (set by some Railway versions)
     volume_mount = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH", "").strip()
     if volume_mount and os.path.exists(volume_mount):
-        return os.path.join(volume_mount, "gymid.db")
+        if _test_volume_writeability(volume_mount):
+            return os.path.join(volume_mount, "gymid.db")
+        else:
+            log.warning(f"Volume {volume_mount} is not reliably writable, falling back to /tmp")
     
     # Try to find actual mounted volume in Railway's standard location
-    # but test it first to ensure it's writable
     try:
         base = "/var/lib/containers/railwayapp/bind-mounts"
         if os.path.exists(base):
@@ -28,23 +30,31 @@ def _get_db_path():
                     for vol_dir in os.listdir(project_path):
                         vol_path = os.path.join(project_path, vol_dir)
                         if os.path.isdir(vol_path):
-                            # Test if volume is writable
-                            test_file = os.path.join(vol_path, ".write_test")
-                            try:
-                                with open(test_file, "w") as f:
-                                    f.write("test")
-                                os.remove(test_file)
+                            if _test_volume_writeability(vol_path):
                                 db_path = os.path.join(vol_path, "gymid.db")
                                 log.info(f"Found writable Railway volume mount at {vol_path}")
                                 return db_path
-                            except (IOError, OSError) as e:
-                                log.warning(f"Volume {vol_path} not writable: {e}")
+                            else:
+                                log.warning(f"Volume {vol_path} has I/O issues, skipping")
     except Exception as e:
         log.debug(f"Failed to scan for Railway mount: {e}")
     
     # Fallback to /tmp (ephemeral but reliable on Railway)
     log.warning("Using /tmp/gymid.db - database will not persist across container restarts")
     return "/tmp/gymid.db"
+
+def _test_volume_writeability(path):
+    """Test if a volume is writable and doesn't have I/O errors."""
+    try:
+        test_file = os.path.join(path, ".write_test_" + str(uuid.uuid4())[:8])
+        with open(test_file, "w") as f:
+            f.write("test")
+        os.fsync(test_file)  # Force to disk
+        os.remove(test_file)
+        return True
+    except (IOError, OSError) as e:
+        log.debug(f"Volume {path} writability test failed: {e}")
+        return False
 
 DB_PATH = _get_db_path()
 log.info(f"Using database path: {DB_PATH}")
@@ -101,20 +111,46 @@ class Database:
             "CREATE INDEX IF NOT EXISTS idx_ci ON checkins(checkin_at)",
         ]
         
+        io_errors = 0
         for i, stmt in enumerate(statements):
-            for attempt in range(3):
+            for attempt in range(2):
                 try:
                     with self._conn() as c:
                         c.execute(stmt)
                         c.commit()
+                    io_errors = 0  # Reset on success
                     break
                 except sqlite3.OperationalError as e:
-                    if attempt < 2:
-                        log.warning(f"Schema statement {i} failed (attempt {attempt+1}/3): {e}, retrying...")
+                    if "disk I/O error" in str(e):
+                        io_errors += 1
+                        if io_errors >= 2:
+                            log.error(f"Persistent disk I/O errors on volume, switching to /tmp")
+                            self._switch_to_tmp()
+                            # Retry with /tmp
+                            try:
+                                with self._conn() as c:
+                                    c.execute(stmt)
+                                    c.commit()
+                                break
+                            except Exception as e2:
+                                log.error(f"Schema statement {i} failed on /tmp: {e2}")
+                                raise
+                    
+                    if attempt < 1:
+                        log.warning(f"Schema statement {i} failed (attempt {attempt+1}/2): {e}, retrying...")
                         time.sleep(0.5)
                     else:
-                        log.error(f"Schema statement {i} failed after 3 attempts: {e}")
+                        log.error(f"Schema statement {i} failed after 2 attempts: {e}")
                         raise
+    
+    def _switch_to_tmp(self):
+        """Switch to /tmp database."""
+        global DB_PATH
+        new_path = "/tmp/gymid.db"
+        log.warning(f"Switching database from {self.path} to {new_path}")
+        self.path = new_path
+        DB_PATH = new_path
+        os.makedirs(os.path.dirname(new_path), exist_ok=True)
 
     def insert_member(self, m):
         with self._conn() as c:
