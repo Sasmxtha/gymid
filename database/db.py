@@ -4,12 +4,13 @@ from datetime import datetime, date
 from typing import Optional, Dict, List, Any
 
 log     = logging.getLogger("gymid.db")
-DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(os.path.dirname(__file__)), "gymid.db"))
+DB_PATH = os.environ.get("DB_PATH", "/tmp/gymid.db")
 
 class Database:
     def __init__(self, path=DB_PATH):
         self.path = path
-        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+        db_dir = os.path.dirname(self.path) or "."
+        os.makedirs(db_dir, exist_ok=True)
         self._init_schema()
         log.info(f"DB ready: {path}")
 
