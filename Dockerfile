@@ -22,8 +22,8 @@ COPY . .
 RUN mkdir -p /app/data && chmod 755 /app/data
 RUN mkdir -p /data && chmod 755 /data
 
-# Preload the InsightFace model during build
-RUN python preload_model.py
+# Preload the InsightFace model during build (non-blocking - failures are okay)
+RUN python preload_model.py || echo "Model preload skipped or deferred to first use"
 
 EXPOSE 5000
 

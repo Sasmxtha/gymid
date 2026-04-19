@@ -24,6 +24,7 @@ class FaceEngine:
         log.info(f"InsightFace model cache directory: {model_root}")
 
         # ── Try buffalo_l first (best accuracy, needs ~300MB download) ──
+        # ── Then buffalo_sc (smaller, more memory-efficient) ──
         for model_name in ["buffalo_l", "buffalo_sc"]:
             try:
                 from insightface.app import FaceAnalysis
@@ -31,18 +32,29 @@ class FaceEngine:
                 app = FaceAnalysis(
                     name=model_name,
                     root=model_root,
-                    providers=["CUDAExecutionProvider", "CPUExecutionProvider"]
+                    providers=["CPUExecutionProvider"]  # Use CPU only to avoid GPU OOM
                 )
                 # buffalo_l works best at 640x640, buffalo_sc at 320x320
                 det_size = (640, 640) if model_name == "buffalo_l" else (320, 320)
                 log.info(f"Calling app.prepare() for {model_name} with det_size={det_size}...")
-                app.prepare(ctx_id=0, det_size=det_size)
+                app.prepare(ctx_id=-1, det_size=det_size)  # ctx_id=-1 forces CPU
                 self._model  = app
                 self.backend = model_name
                 log.info(f"✅ Face engine ready: {model_name} (det_size={det_size})")
                 return
+            except MemoryError as e:
+                log.warning(f"{model_name} failed due to memory constraint: {e}. Trying fallback...")
+            except RuntimeError as e:
+                if "cuda" in str(e).lower() or "out of memory" in str(e).lower():
+                    log.warning(f"{model_name} failed due to GPU/memory issue: {e}. Trying fallback...")
+                else:
+                    log.warning(f"{model_name} failed: {e}")
             except Exception as e:
-                log.warning(f"{model_name} failed: {e}")
+                error_str = str(e).lower()
+                if "memory" in error_str or "cuda" in error_str or "gpu" in error_str:
+                    log.warning(f"{model_name} failed due to memory: {e}. Trying fallback...")
+                else:
+                    log.warning(f"{model_name} failed: {e}")
 
         # ── Last resort: OpenCV Haar ──
         import cv2
