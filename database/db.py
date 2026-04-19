@@ -18,6 +18,7 @@ def _get_db_path():
         return os.path.join(volume_mount, "gymid.db")
     
     # Try to find actual mounted volume in Railway's standard location
+    # but test it first to ensure it's writable
     try:
         base = "/var/lib/containers/railwayapp/bind-mounts"
         if os.path.exists(base):
@@ -27,13 +28,22 @@ def _get_db_path():
                     for vol_dir in os.listdir(project_path):
                         vol_path = os.path.join(project_path, vol_dir)
                         if os.path.isdir(vol_path):
-                            db_path = os.path.join(vol_path, "gymid.db")
-                            log.info(f"Found Railway volume mount at {vol_path}")
-                            return db_path
+                            # Test if volume is writable
+                            test_file = os.path.join(vol_path, ".write_test")
+                            try:
+                                with open(test_file, "w") as f:
+                                    f.write("test")
+                                os.remove(test_file)
+                                db_path = os.path.join(vol_path, "gymid.db")
+                                log.info(f"Found writable Railway volume mount at {vol_path}")
+                                return db_path
+                            except (IOError, OSError) as e:
+                                log.warning(f"Volume {vol_path} not writable: {e}")
     except Exception as e:
         log.debug(f"Failed to scan for Railway mount: {e}")
     
     # Fallback to /tmp (ephemeral but reliable on Railway)
+    log.warning("Using /tmp/gymid.db - database will not persist across container restarts")
     return "/tmp/gymid.db"
 
 DB_PATH = _get_db_path()
@@ -51,40 +61,60 @@ class Database:
         log.info(f"DB ready: {self.path}")
 
     def _conn(self):
-        c = sqlite3.connect(self.path, check_same_thread=False)
-        c.row_factory = sqlite3.Row
         try:
-            c.execute("PRAGMA journal_mode=WAL")
-        except sqlite3.OperationalError as e:
-            log.warning(f"WAL journal mode failed ({e}), falling back to default")
+            c = sqlite3.connect(self.path, check_same_thread=False, timeout=10.0)
+            c.row_factory = sqlite3.Row
+            # Try to set pragmas, but don't fail if they don't work
             try:
-                c.execute("PRAGMA journal_mode=DELETE")
-            except sqlite3.OperationalError as e2:
-                log.warning(f"DELETE journal mode also failed ({e2}), proceeding without journal")
-        c.execute("PRAGMA foreign_keys=ON")
-        return c
+                c.execute("PRAGMA journal_mode=WAL")
+            except sqlite3.OperationalError:
+                try:
+                    c.execute("PRAGMA journal_mode=DELETE")
+                except sqlite3.OperationalError:
+                    log.debug("Journal modes unavailable, continuing without")
+            try:
+                c.execute("PRAGMA foreign_keys=ON")
+            except sqlite3.OperationalError:
+                log.debug("Foreign keys pragma unavailable")
+            return c
+        except sqlite3.OperationalError as e:
+            raise RuntimeError(f"Cannot connect to database at {self.path}: {e}. Check volume mount.")
 
     def _init_schema(self):
-        with self._conn() as c:
-            c.executescript("""
-                CREATE TABLE IF NOT EXISTS members(
-                    id TEXT PRIMARY KEY, name TEXT NOT NULL,
-                    email TEXT NOT NULL UNIQUE, phone TEXT NOT NULL,
-                    plan TEXT NOT NULL, photo_count INTEGER DEFAULT 0,
-                    embedding_count INTEGER DEFAULT 0,
-                    registered_at TEXT NOT NULL, active INTEGER DEFAULT 1);
-                CREATE TABLE IF NOT EXISTS face_embeddings(
-                    id TEXT PRIMARY KEY, member_id TEXT NOT NULL,
-                    embedding TEXT NOT NULL, is_mean INTEGER DEFAULT 0,
-                    created_at TEXT NOT NULL,
-                    FOREIGN KEY(member_id) REFERENCES members(id) ON DELETE CASCADE);
-                CREATE TABLE IF NOT EXISTS checkins(
-                    id TEXT PRIMARY KEY, member_id TEXT NOT NULL,
-                    confidence REAL NOT NULL, checkin_at TEXT NOT NULL,
-                    FOREIGN KEY(member_id) REFERENCES members(id));
-                CREATE INDEX IF NOT EXISTS idx_emb ON face_embeddings(member_id);
-                CREATE INDEX IF NOT EXISTS idx_ci  ON checkins(checkin_at);
-            """)
+        statements = [
+            """CREATE TABLE IF NOT EXISTS members(
+                id TEXT PRIMARY KEY, name TEXT NOT NULL,
+                email TEXT NOT NULL UNIQUE, phone TEXT NOT NULL,
+                plan TEXT NOT NULL, photo_count INTEGER DEFAULT 0,
+                embedding_count INTEGER DEFAULT 0,
+                registered_at TEXT NOT NULL, active INTEGER DEFAULT 1)""",
+            """CREATE TABLE IF NOT EXISTS face_embeddings(
+                id TEXT PRIMARY KEY, member_id TEXT NOT NULL,
+                embedding TEXT NOT NULL, is_mean INTEGER DEFAULT 0,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(member_id) REFERENCES members(id) ON DELETE CASCADE)""",
+            """CREATE TABLE IF NOT EXISTS checkins(
+                id TEXT PRIMARY KEY, member_id TEXT NOT NULL,
+                confidence REAL NOT NULL, checkin_at TEXT NOT NULL,
+                FOREIGN KEY(member_id) REFERENCES members(id))""",
+            "CREATE INDEX IF NOT EXISTS idx_emb ON face_embeddings(member_id)",
+            "CREATE INDEX IF NOT EXISTS idx_ci ON checkins(checkin_at)",
+        ]
+        
+        for i, stmt in enumerate(statements):
+            for attempt in range(3):
+                try:
+                    with self._conn() as c:
+                        c.execute(stmt)
+                        c.commit()
+                    break
+                except sqlite3.OperationalError as e:
+                    if attempt < 2:
+                        log.warning(f"Schema statement {i} failed (attempt {attempt+1}/3): {e}, retrying...")
+                        time.sleep(0.5)
+                    else:
+                        log.error(f"Schema statement {i} failed after 3 attempts: {e}")
+                        raise
 
     def insert_member(self, m):
         with self._conn() as c:
