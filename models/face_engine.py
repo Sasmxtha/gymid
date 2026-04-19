@@ -23,9 +23,9 @@ class FaceEngine:
         os.makedirs(model_root, exist_ok=True)
         log.info(f"InsightFace model cache directory: {model_root}")
 
-        # ── Try buffalo_l first (best accuracy, needs ~300MB download) ──
-        # ── Then buffalo_sc (smaller, more memory-efficient) ──
-        for model_name in ["buffalo_l", "buffalo_sc"]:
+        # ── Try buffalo_sc first (smaller, more memory-efficient) ──
+        # ── Then buffalo_l (best accuracy, needs ~300MB download) ──
+        for model_name in ["buffalo_sc", "buffalo_l"]:
             try:
                 from insightface.app import FaceAnalysis
                 log.info(f"Loading InsightFace {model_name} (root={model_root}) — this may take a moment on first run...")
