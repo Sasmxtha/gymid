@@ -5,7 +5,7 @@ import numpy as np
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
-sys.path.insert(0, "/content/gymid")
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 try:
     from dotenv import load_dotenv; load_dotenv()
 except: pass
@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 log = logging.getLogger("gymid")
 
-FRONTEND = "/content/gymid/frontend"
+FRONTEND = os.path.join(os.path.dirname(__file__), "..", "frontend")
 application = Flask(__name__, static_folder=FRONTEND, static_url_path="") # Changed app to application
 CORS(application, resources={r"/api/*": {"origins": "*"}})
 app = application # Alias for compatibility
