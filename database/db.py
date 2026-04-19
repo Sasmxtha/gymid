@@ -1,5 +1,5 @@
 
-import os, json, sqlite3, logging, uuid
+import os, json, sqlite3, logging, uuid, time
 from datetime import datetime, date
 from typing import Optional, Dict, List, Any
 
@@ -16,9 +16,14 @@ class Database:
     def __init__(self, path=DB_PATH):
         self.path = path or DEFAULT_DB_PATH
         db_dir = os.path.dirname(self.path)
-        if not db_dir:
-            db_dir = os.getcwd()
-            self.path = os.path.join(db_dir, os.path.basename(self.path) or "gymid.db")
+        # Wait for volume to be mounted
+        for i in range(30):
+            if os.path.exists(db_dir):
+                break
+            log.info(f"Waiting for volume mount at {db_dir}... ({i+1}/30)")
+            time.sleep(1)
+        else:
+            raise RuntimeError(f"Volume not mounted after 30s: {db_dir}")
         os.makedirs(db_dir, exist_ok=True)
         self._init_schema()
         log.info(f"DB ready: {path}")
