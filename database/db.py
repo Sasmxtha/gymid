@@ -3,31 +3,52 @@ import os, json, sqlite3, logging, uuid, time
 from datetime import datetime, date
 from typing import Optional, Dict, List, Any
 
-log     = logging.getLogger("gymid.db")
-project_id = os.environ.get("RAILWAY_PROJECT_ID", "562acf8c-c0a6-41e8-b4d7-f37249b91679")
-volume_name = os.environ.get("RAILWAY_VOLUME_NAME", "vol_3cygu5nc1sov070u")
-mount_path = os.path.join("/var/lib/containers/railwayapp/bind-mounts", project_id, volume_name)
-DEFAULT_DB_PATH = os.path.join(mount_path, "gymid.db")
-DB_PATH = os.environ.get("DB_PATH", "")
-if not DB_PATH or not DB_PATH.strip():
-    DB_PATH = DEFAULT_DB_PATH
+log = logging.getLogger("gymid.db")
+
+def _get_db_path():
+    """Detect Railway volume mount or use fallback."""
+    # Try explicit env var first
+    db_path = os.environ.get("DB_PATH", "").strip()
+    if db_path:
+        return db_path
+    
+    # Try RAILWAY_VOLUME_MOUNT_PATH (set by some Railway versions)
+    volume_mount = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH", "").strip()
+    if volume_mount and os.path.exists(volume_mount):
+        return os.path.join(volume_mount, "gymid.db")
+    
+    # Try to find actual mounted volume in Railway's standard location
+    try:
+        base = "/var/lib/containers/railwayapp/bind-mounts"
+        if os.path.exists(base):
+            for project_dir in os.listdir(base):
+                project_path = os.path.join(base, project_dir)
+                if os.path.isdir(project_path):
+                    for vol_dir in os.listdir(project_path):
+                        vol_path = os.path.join(project_path, vol_dir)
+                        if os.path.isdir(vol_path):
+                            db_path = os.path.join(vol_path, "gymid.db")
+                            log.info(f"Found Railway volume mount at {vol_path}")
+                            return db_path
+    except Exception as e:
+        log.debug(f"Failed to scan for Railway mount: {e}")
+    
+    # Fallback to /tmp (ephemeral but reliable on Railway)
+    return "/tmp/gymid.db"
+
+DB_PATH = _get_db_path()
+log.info(f"Using database path: {DB_PATH}")
 
 class Database:
     def __init__(self, path=DB_PATH):
-        self.path = path or DEFAULT_DB_PATH
+        self.path = path or DB_PATH
         db_dir = os.path.dirname(self.path)
-        # Wait for volume to be mounted
-        for i in range(60):
-            if os.path.exists(db_dir):
-                break
-            if i % 10 == 0:
-                log.info(f"Waiting for volume mount at {db_dir}... ({i+1}/60)")
-            time.sleep(1)
-        else:
-            raise RuntimeError(f"Volume not mounted after 60s: {db_dir}")
+        if not db_dir:
+            db_dir = os.getcwd()
+            self.path = os.path.join(db_dir, os.path.basename(self.path) or "gymid.db")
         os.makedirs(db_dir, exist_ok=True)
         self._init_schema()
-        log.info(f"DB ready: {path}")
+        log.info(f"DB ready: {self.path}")
 
     def _conn(self):
         c = sqlite3.connect(self.path, check_same_thread=False)
