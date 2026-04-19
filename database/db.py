@@ -4,10 +4,7 @@ from datetime import datetime, date
 from typing import Optional, Dict, List, Any
 
 log     = logging.getLogger("gymid.db")
-project_id = os.environ.get("RAILWAY_PROJECT_ID", "f1d45b1f-f925-4005-9381-1ac35c3509da")
-volume_name = os.environ.get("RAILWAY_VOLUME_NAME", "vol_3cygu5nc1sov070u")
-mount_path = os.path.join("/var/lib/containers/railwayapp/bind-mounts", project_id, volume_name)
-DEFAULT_DB_PATH = os.path.join(mount_path, "gymid.db")
+DEFAULT_DB_PATH = os.path.join("/data", "gymid.db")
 DB_PATH = os.environ.get("DB_PATH", "")
 if not DB_PATH or not DB_PATH.strip():
     DB_PATH = DEFAULT_DB_PATH
@@ -17,13 +14,14 @@ class Database:
         self.path = path or DEFAULT_DB_PATH
         db_dir = os.path.dirname(self.path)
         # Wait for volume to be mounted
-        for i in range(30):
+        for i in range(60):
             if os.path.exists(db_dir):
                 break
-            log.info(f"Waiting for volume mount at {db_dir}... ({i+1}/30)")
+            if i % 10 == 0:
+                log.info(f"Waiting for volume mount at {db_dir}... ({i+1}/60)")
             time.sleep(1)
         else:
-            raise RuntimeError(f"Volume not mounted after 30s: {db_dir}")
+            raise RuntimeError(f"Volume not mounted after 60s: {db_dir}")
         os.makedirs(db_dir, exist_ok=True)
         self._init_schema()
         log.info(f"DB ready: {path}")
