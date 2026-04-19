@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     libxrender-dev \
     libgomp1 \
     libgl1 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -19,5 +20,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 EXPOSE 5000
+
+HEALTHCHECK --start-period=60s --interval=10s --timeout=5s --retries=3 \
+  CMD curl -f http://localhost:5000/api/health || exit 1
 
 CMD ["python", "app.py"]
