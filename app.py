@@ -115,38 +115,69 @@ def register():
             return jsonify({"error": "Email already registered"}), 409
 
         # Decode images
-        images = [img for img in (decode_img(p) for p in body["photos"]) if img is not None]
+        try:
+            images = [img for img in (decode_img(p) for p in body["photos"]) if img is not None]
+            log.info(f"Register: Decoded {len(images)} images from {len(body['photos'])} photos")
+        except Exception as e:
+            log.error(f"Register: Image decode failed: {e}", exc_info=True)
+            return jsonify({"error": f"Failed to decode photos: {str(e)[:50]}"}), 400
 
         # Augment: 5 photos × 20 = 100 samples
-        augmented = []
-        for img in images:
-            augmented.append(img)
-            augmented.extend(get_augmentor().augment(img, n=19))
+        try:
+            augmented = []
+            for img in images:
+                augmented.append(img)
+                augmented.extend(get_augmentor().augment(img, n=19))
+            log.info(f"Register: Augmented to {len(augmented)} images")
+        except Exception as e:
+            log.error(f"Register: Augmentation failed: {e}", exc_info=True)
+            return jsonify({"error": f"Image augmentation failed: {str(e)[:50]}"}), 500
 
         # Extract embeddings
-        embeddings = [e for e in (get_face_engine().extract_embedding(img) for img in augmented) if e is not None]
+        try:
+            engine = get_face_engine()
+            log.info(f"Register: FaceEngine loaded (backend={engine.backend})")
+            embeddings = [e for e in (engine.extract_embedding(img) for img in augmented) if e is not None]
+            log.info(f"Register: Extracted {len(embeddings)} embeddings from {len(augmented)} augmented images")
+        except Exception as e:
+            log.error(f"Register: Embedding extraction failed: {e}", exc_info=True)
+            return jsonify({"error": f"Face detection failed: {str(e)[:50]}"}), 500
+        
         if len(embeddings) < 5:
             return jsonify({"error": "Could not detect face. Better lighting, no mask, face centred."}), 422
 
         # Save to DB
-        db.insert_member({
-            "id": body["id"], "name": body["name"], "email": body["email"],
-            "phone": body["phone"], "plan": body["plan"],
-            "photo_count": len(body["photos"]), "embedding_count": len(embeddings)
-        })
-        for emb in embeddings:
-            db.insert_embedding(body["id"], emb.tolist(), is_mean=False)
-        # Store mean embedding too
-        mean_emb = np.mean(embeddings, axis=0)
-        mean_emb /= (np.linalg.norm(mean_emb) + 1e-9)
-        db.insert_embedding(body["id"], mean_emb.tolist(), is_mean=True)
+        try:
+            log.info(f"Register: Inserting member {body['id']}")
+            db.insert_member({
+                "id": body["id"], "name": body["name"], "email": body["email"],
+                "phone": body["phone"], "plan": body["plan"],
+                "photo_count": len(body["photos"]), "embedding_count": len(embeddings)
+            })
+            log.info(f"Register: Inserted member, now saving {len(embeddings)} embeddings")
+            for i, emb in enumerate(embeddings):
+                db.insert_embedding(body["id"], emb.tolist(), is_mean=False)
+            
+            # Store mean embedding too
+            mean_emb = np.mean(embeddings, axis=0)
+            mean_emb /= (np.linalg.norm(mean_emb) + 1e-9)
+            db.insert_embedding(body["id"], mean_emb.tolist(), is_mean=True)
+            log.info(f"Register: Saved all embeddings for {body['id']}")
+        except Exception as e:
+            log.error(f"Register: Database save failed: {e}", exc_info=True)
+            # Try to clean up
+            try:
+                db.delete_member(body["id"])
+            except:
+                pass
+            return jsonify({"error": f"Failed to save member: {str(e)[:50]}"}), 500
 
-        log.info(f"Registered {body['name']} — {len(embeddings)} embeddings (buffalo_l)")
+        log.info(f"Registered {body['name']} — {len(embeddings)} embeddings")
         return jsonify({"success": True, "member_id": body["id"], "embeddings_stored": len(embeddings)})
 
     except Exception as e:
-        log.error(traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
+        log.error(f"Register: Unexpected error: {traceback.format_exc()}")
+        return jsonify({"error": f"Unexpected error: {str(e)[:50]}"}), 500
 
 # ── Detect ────────────────────────────────────────────────────────────────────
 @application.route("/api/detect", methods=["POST"])
