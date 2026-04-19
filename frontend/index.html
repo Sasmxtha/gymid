@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>GymID</title>
+<style>
+:root{--blue:#185FA5;--blt:#E6F1FB;--green:#0F6E56;--glt:#EAF3DE;--gm:#1D9E75;--red:#A32D2D;--rlt:#FCEBEB;--alt:#FAEEDA;--amb:#854F0B;--tx:#1a1a1a;--t2:#555;--t3:#888;--bd:rgba(0,0,0,.12);--b2:rgba(0,0,0,.22);--bg:#f7f7f5;--cd:#fff;--r:10px;--rl:14px;}
+@media(prefers-color-scheme:dark){:root{--tx:#f0f0ee;--t2:#aaa;--t3:#666;--bd:rgba(255,255,255,.1);--b2:rgba(255,255,255,.2);--bg:#141414;--cd:#1e1e1e;--blt:#0c2a45;--glt:#0a2e20;--rlt:#2a0f0f;}}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--tx);}
+.app{max-width:480px;margin:0 auto;padding:16px;}
+.hdr{display:flex;align-items:center;gap:12px;padding:16px 0 20px;}
+.logo{width:40px;height:40px;background:var(--blue);border-radius:10px;display:flex;align-items:center;justify-content:center;}
+.logo svg{width:22px;height:22px;fill:white;}
+.dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;}
+.dot.on{background:var(--gm);}
+.tabs{display:flex;background:var(--cd);border:0.5px solid var(--bd);border-radius:var(--rl);padding:4px;gap:4px;margin-bottom:18px;}
+.tab{flex:1;padding:7px 2px;text-align:center;font-size:12px;font-weight:500;border-radius:var(--r);cursor:pointer;color:var(--t2);border:none;background:none;transition:all .15s;}
+.tab.active{background:var(--blue);color:white;}
+.card{background:var(--cd);border:0.5px solid var(--bd);border-radius:var(--rl);padding:16px 18px;margin-bottom:14px;}
+.ct{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;}
+.field{margin-bottom:12px;}.field label{display:block;font-size:13px;color:var(--t2);margin-bottom:5px;}
+.field input,.field select{width:100%;padding:10px 13px;border:0.5px solid var(--b2);border-radius:var(--r);font-size:14px;color:var(--tx);background:var(--cd);outline:none;}
+.field input:focus,.field select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(24,95,165,.12);}
+.btn{width:100%;padding:11px;border-radius:var(--r);font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all .15s;}
+.bb{background:var(--blue);color:white;}.bb:hover{opacity:.9;}
+.bg{background:var(--green);color:white;}.bg:hover{opacity:.9;}
+.bo{background:transparent;color:var(--t2);border:0.5px solid var(--b2);}
+.br{background:var(--red);color:white;}.btn:disabled{opacity:.4;cursor:not-allowed;}.btn+.btn{margin-top:8px;}
+.cw{position:relative;width:100%;aspect-ratio:1;background:#000;border-radius:var(--rl);overflow:hidden;margin-bottom:12px;}
+.cw video{width:100%;height:100%;object-fit:cover;display:block;}
+.oval{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:70%;aspect-ratio:.75;border:2.5px solid rgba(255,255,255,.6);border-radius:50%;pointer-events:none;}
+.hint{position:absolute;bottom:0;left:0;right:0;padding:10px;background:linear-gradient(transparent,rgba(0,0,0,.65));color:white;font-size:13px;text-align:center;}
+.sp{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:74%;aspect-ratio:.75;border-radius:50%;border:3px solid transparent;border-top-color:var(--gm);animation:spin 1.1s linear infinite;display:none;pointer-events:none;}
+@keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg);}}
+.cw.sc .sp{display:block;}
+.ag{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:12px;}
+.ad{aspect-ratio:1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:10px;font-weight:500;border:1.5px dashed var(--b2);color:var(--t3);background:var(--bg);transition:all .2s;}
+.ad .ic{font-size:14px;}
+.ad.active{background:var(--blt);border-color:#378ADD;color:var(--blue);animation:blink 1.2s ease-in-out infinite;}
+.ad.done{background:var(--glt);border-color:var(--gm);color:var(--green);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.65}}
+.pb{height:5px;background:var(--bd);border-radius:3px;margin-bottom:8px;}
+.pf{height:100%;border-radius:3px;background:var(--blue);transition:width .35s;}
+.strip{display:flex;gap:7px;margin-bottom:14px;}
+.th{width:54px;height:54px;border-radius:8px;object-fit:cover;border:2px solid var(--gm);}
+.te{width:54px;height:54px;border-radius:8px;border:1.5px dashed var(--b2);background:var(--bg);}
+.mr{display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:0.5px solid var(--bd);}
+.mr:last-child{border:none;}
+.av{width:38px;height:38px;border-radius:50%;background:var(--blt);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--blue);flex-shrink:0;}
+.mn{font-size:14px;font-weight:500;}.ms{font-size:12px;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.badge{font-size:11px;font-weight:500;padding:3px 8px;border-radius:20px;}
+.bl{background:var(--blt);color:var(--blue);}.bgl{background:var(--glt);color:var(--green);}
+.mc{background:var(--glt);border:0.5px solid var(--gm);border-radius:var(--rl);padding:14px 16px;margin-bottom:12px;}
+.mc .mn{color:#0a3d28;font-size:17px;}
+.nc{background:var(--rlt);border:0.5px solid #F7C1C1;border-radius:var(--rl);padding:14px 16px;margin-bottom:12px;}
+.nc .mn{color:var(--red);font-size:15px;}.nc p{font-size:12px;color:var(--red);margin-top:4px;}
+.sb{padding:10px 14px;border-radius:var(--r);font-size:13px;text-align:center;margin-bottom:12px;background:var(--bg);color:var(--t3);border:0.5px solid var(--bd);}
+.it{width:100%;border-collapse:collapse;font-size:13px;}
+.it td{padding:5px 0;}.it td:first-child{color:var(--t3);width:42%;}.it td:last-child{font-weight:500;text-align:right;}
+.sw{text-align:center;padding:2rem 0;}
+.si{width:64px;height:64px;border-radius:50%;background:var(--glt);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:26px;}
+.sw h2{font-size:20px;font-weight:600;margin-bottom:6px;}.sw p{font-size:13px;color:var(--t2);margin-bottom:20px;}
+.ae{background:var(--rlt);color:var(--red);border:0.5px solid #F09595;border-radius:var(--r);padding:10px 13px;font-size:13px;margin-bottom:12px;display:none;}
+.cr{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--bd);}
+.cr:last-child{border:none;}
+.tip{background:var(--alt);border:0.5px solid #EF9F27;border-radius:var(--r);padding:11px 13px;margin-bottom:12px;font-size:13px;color:var(--amb);}
+.model-tag{font-size:11px;background:var(--glt);color:var(--green);padding:2px 8px;border-radius:20px;font-weight:600;}
+canvas{display:none;}
+.hidden{display:none!important;}
+</style>
+</head>
+<body>
+<div class="app">
+ <div class="hdr">
+  <div class="logo"><svg viewBox="0 0 24 24"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg></div>
+  <div style="flex:1"><div style="font-size:17px;font-weight:600">GymID <span class="model-tag" id="eng">...</span></div><div style="font-size:12px;color:var(--t3)">Face recognition check-in</div></div>
+  <div><span class="dot" id="sdot"></span> <span style="font-size:11px;color:var(--t3)" id="slbl">...</span></div>
+ </div>
+ <div class="tabs">
+  <button class="tab active" onclick="showTab('reg')">Register</button>
+  <button class="tab" onclick="showTab('det')">Check-in</button>
+  <button class="tab" onclick="showTab('mem')">Members</button>
+  <button class="tab" onclick="showTab('log')">Log</button>
+  <button class="tab" onclick="showTab('cal')">Calibrate</button>
+ </div>
+
+ <!-- REGISTER -->
+ <div id="tab-reg">
+  <div id="vform"><div class="card">
+   <div class="ct">New member</div>
+   <div class="ae" id="rerr"></div>
+   <div class="field"><label>Full name</label><input id="rn" type="text" placeholder="Arjun Kumar"/></div>
+   <div class="field"><label>Email</label><input id="re" type="email" placeholder="arjun@example.com"/></div>
+   <div class="field"><label>Phone</label><input id="rp" type="tel" placeholder="+91 98765 43210"/></div>
+   <div class="field"><label>Plan</label>
+    <select id="rpl"><option value="">Select plan...</option>
+     <option>Monthly &#8212; &#8377;999</option><option>Quarterly &#8212; &#8377;2499</option><option>Annual &#8212; &#8377;8999</option>
+    </select></div>
+   <button class="btn bb" onclick="goCapture()">Proceed to face setup &rarr;</button>
+  </div></div>
+  <div id="vcap" class="hidden"><div class="card">
+   <div class="ct" id="ch">Step 1 of 5</div>
+   <div class="cw" id="cc"><video id="cv" autoplay playsinline muted></video><div class="oval"></div><div class="sp"></div><div class="hint" id="chn">Centre face in oval</div><canvas id="cs"></canvas></div>
+   <div class="ag" id="ag"></div>
+   <div class="pb"><div class="pf" id="pf" style="width:0%"></div></div>
+   <div style="font-size:12px;color:var(--t3);margin-bottom:10px" id="pl">0 / 5 captured</div>
+   <div class="strip" id="st"></div>
+   <button class="btn bb" id="bsnap" onclick="snap()">Capture photo</button>
+   <button class="btn bo" onclick="cancelCap()">Cancel</button>
+  </div></div>
+  <div id="vsuc" class="hidden"><div class="card"><div class="sw">
+   <div class="si">&#10003;</div><h2 id="sn">Done!</h2><p id="sd"></p>
+   <div class="card" style="text-align:left;margin-bottom:16px"><table class="it" id="stbl"></table></div>
+   <button class="btn bb" onclick="resetReg()">Register another</button>
+  </div></div></div>
+ </div>
+
+ <!-- DETECT -->
+ <div id="tab-det" class="hidden"><div class="card">
+  <div class="ct">Face check-in</div>
+  <div class="sb" id="ds">Camera off &#8212; press Start</div>
+  <div id="dcw" class="hidden"><div class="cw sc" id="dc"><video id="dv" autoplay playsinline muted></video><div class="oval"></div><div class="sp"></div><div class="hint" id="dh">Look at the camera</div><canvas id="df"></canvas></div></div>
+  <div id="dr"></div>
+  <button class="btn bb" id="bds" onclick="startDet()">Start camera</button>
+  <button class="btn br hidden" id="bdd" onclick="stopDet()">Stop</button>
+ </div></div>
+
+ <!-- MEMBERS -->
+ <div id="tab-mem" class="hidden"><div class="card">
+  <div class="ct">Members <span id="mc" style="color:var(--blue)"></span></div>
+  <div id="ml"><div style="color:var(--t3);font-size:13px;padding:12px 0;text-align:center">Loading...</div></div>
+ </div></div>
+
+ <!-- LOG -->
+ <div id="tab-log" class="hidden"><div class="card">
+  <div class="ct">Today&#39;s check-ins</div>
+  <div id="cl"><div style="color:var(--t3);font-size:13px;padding:12px 0;text-align:center">Loading...</div></div>
+ </div></div>
+
+ <!-- CALIBRATE -->
+ <div id="tab-cal" class="hidden"><div class="card">
+  <div class="ct">Threshold calibration</div>
+  <div class="tip">Start the Check-in camera, stand in front of it, then click Probe. It shows your raw score and recommends the ideal threshold for your camera and lighting.</div>
+  <div style="margin-bottom:14px">
+   <label style="font-size:13px;color:var(--t2);display:block;margin-bottom:6px">Current threshold: <strong id="tv">...</strong></label>
+   <input type="range" id="tsl" min="0.10" max="0.90" step="0.01" style="width:100%" oninput="document.getElementById('tv').textContent=parseFloat(this.value).toFixed(2)"/>
+   <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--t3);margin-top:4px"><span>0.10 (loose)</span><span>0.90 (strict)</span></div>
+  </div>
+  <button class="btn bb" onclick="applyThr()">Apply threshold</button>
+  <button class="btn bo" style="margin-top:8px" onclick="probe()">Probe current frame &rarr;</button>
+  <div id="pr" style="margin-top:14px"></div>
+ </div></div>
+
+</div>
+<script>
+const API='';
+let cS=null,dS=null,dT=null,photos=[],ang=0,curM=null;
+const ANGLES=[
+ {l:'Center',i:'&#9711;',h:'Look straight at camera'},
+ {l:'Left',i:'&#9664;',h:'Turn slightly left'},
+ {l:'Right',i:'&#9654;',h:'Turn slightly right'},
+ {l:'Up',i:'&#9650;',h:'Tilt slightly up'},
+ {l:'Down',i:'&#9660;',h:'Tilt slightly down'},
+];
+
+async function ping(){
+ try{
+  const d=await(await fetch(API+'/api/health')).json();
+  document.getElementById('sdot').className='dot on';
+  document.getElementById('slbl').textContent=`Online · ${d.members} members`;
+  document.getElementById('eng').textContent=d.engine||'?';
+  const sl=document.getElementById('tsl');
+  sl.value=d.threshold;
+  document.getElementById('tv').textContent=parseFloat(d.threshold).toFixed(2);
+ }catch{
+  document.getElementById('sdot').className='dot';
+  document.getElementById('slbl').textContent='Offline';
+ }
+}
+ping(); setInterval(ping,30000);
+
+function showTab(n){
+ ['reg','det','mem','log','cal'].forEach(t=>document.getElementById('tab-'+t).classList.toggle('hidden',t!==n));
+ document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['reg','det','mem','log','cal'][i]===n));
+ if(n==='mem')loadMem(); if(n==='log')loadLog();
+}
+
+function goCapture(){
+ const n=document.getElementById('rn').value.trim(),e=document.getElementById('re').value.trim(),
+       p=document.getElementById('rp').value.trim(),pl=document.getElementById('rpl').value;
+ const err=document.getElementById('rerr'); err.style.display='none';
+ if(!n||!e||!p||!pl){err.textContent='Fill all fields.';err.style.display='block';return;}
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)){err.textContent='Invalid email.';err.style.display='block';return;}
+ curM={id:'MEM-'+Date.now(),name:n,email:e,phone:p,plan:pl,ts:new Date().toLocaleString()};
+ photos=[];ang=0;
+ document.getElementById('vform').classList.add('hidden');
+ document.getElementById('vcap').classList.remove('hidden');
+ buildGrid();updateCapUI();
+ navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:640,height:640}})
+  .then(s=>{cS=s;document.getElementById('cv').srcObject=s;})
+  .catch(()=>{document.getElementById('chn').textContent='Camera denied. Allow and reload.';});
+}
+
+function buildGrid(){
+ document.getElementById('ag').innerHTML=ANGLES.map((a,i)=>`<div class="ad" id="ad${i}"><span class="ic">${a.i}</span><span>${a.l}</span></div>`).join('');
+}
+
+function updateCapUI(){
+ const done=photos.length;
+ document.getElementById('ch').textContent=`Step ${ang+1} of 5 — ${ANGLES[ang]?.l||'Done'}`;
+ document.getElementById('chn').textContent=ANGLES[ang]?.h||'All done!';
+ document.getElementById('pf').style.width=(done/5*100)+'%';
+ document.getElementById('pl').textContent=`${done} / 5 captured`;
+ ANGLES.forEach((_,i)=>{
+  const el=document.getElementById('ad'+i);
+  el.className='ad'+(i<done?' done':i===done?' active':'');
+  if(i<done)el.querySelector('.ic').innerHTML='&#10003;';
+ });
+ document.getElementById('st').innerHTML=Array.from({length:5},(_,i)=>
+  photos[i]?`<img class="th" src="${photos[i]}"/>`:`<div class="te"></div>`).join('');
+ document.getElementById('bsnap').disabled=done>=5;
+ if(done>=5&&!document.getElementById('bcomp')){
+  const b=document.createElement('button');b.className='btn bg';b.id='bcomp';
+  b.textContent='Complete registration ✓';b.onclick=submitReg;
+  document.getElementById('bsnap').insertAdjacentElement('afterend',b);
+ }
+}
+
+function snap(){
+ const v=document.getElementById('cv'),c=document.getElementById('cs');
+ c.width=224;c.height=224;
+ const ctx=c.getContext('2d');ctx.translate(224,0);ctx.scale(-1,1);ctx.drawImage(v,0,0,224,224);
+ photos.push(c.toDataURL('image/jpeg',0.92));ang++;updateCapUI();
+}
+
+async function submitReg(){
+ const btn=document.getElementById('bcomp');btn.disabled=true;btn.textContent='Processing...';
+ try{
+  const res=await fetch(API+'/api/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...curM,photos})});
+  const data=await res.json();
+  if(!res.ok) throw new Error(data.error||'Failed');
+  cS?.getTracks().forEach(t=>t.stop());
+  document.getElementById('vcap').classList.add('hidden');
+  document.getElementById('vsuc').classList.remove('hidden');
+  document.getElementById('sn').textContent=`Welcome, ${curM.name}!`;
+  document.getElementById('sd').textContent=`${data.embeddings_stored} face embeddings stored (buffalo_l)`;
+  document.getElementById('stbl').innerHTML=
+   `<tr><td>ID</td><td>${curM.id}</td></tr><tr><td>Email</td><td>${curM.email}</td></tr>
+    <tr><td>Phone</td><td>${curM.phone}</td></tr><tr><td>Plan</td><td>${curM.plan}</td></tr>
+    <tr><td>Embeddings</td><td>${data.embeddings_stored}</td></tr>`;
+  ping();
+ }catch(e){btn.disabled=false;btn.textContent='Complete registration ✓';alert('Error: '+e.message);}
+}
+
+function cancelCap(){
+ cS?.getTracks().forEach(t=>t.stop());
+ document.getElementById('vcap').classList.add('hidden');
+ document.getElementById('vform').classList.remove('hidden');
+ document.getElementById('bcomp')?.remove();
+ document.getElementById('bsnap').disabled=false;
+}
+
+function resetReg(){
+ document.getElementById('vsuc').classList.add('hidden');
+ document.getElementById('vform').classList.remove('hidden');
+ ['rn','re','rp'].forEach(id=>document.getElementById(id).value='');
+ document.getElementById('rpl').value='';
+ document.getElementById('bcomp')?.remove();
+ document.getElementById('bsnap').disabled=false;
+}
+
+function startDet(){
+ document.getElementById('dcw').classList.remove('hidden');
+ document.getElementById('bds').classList.add('hidden');
+ document.getElementById('bdd').classList.remove('hidden');
+ document.getElementById('ds').textContent='Starting camera...';
+ navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:480,height:480}})
+  .then(s=>{dS=s;document.getElementById('dv').srcObject=s;
+   document.getElementById('ds').textContent='Scanning — face the camera';
+   dT=setInterval(runDet,2000);})
+  .catch(()=>{document.getElementById('ds').textContent='Camera access denied.';});
+}
+
+async function runDet(){
+ const v=document.getElementById('dv');
+ if(!v.readyState)return;
+ const c=document.getElementById('df');c.width=320;c.height=320;
+ const ctx=c.getContext('2d');ctx.translate(320,0);ctx.scale(-1,1);ctx.drawImage(v,0,0,320,320);
+ try{
+  const res=await fetch(API+'/api/detect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({frame:c.toDataURL('image/jpeg',0.88)})});
+  showResult(await res.json());
+ }catch{document.getElementById('ds').textContent='Server error — retrying...';}
+}
+
+function showResult(data){
+ const el=document.getElementById('dr');
+ if(data.matched&&data.member){
+  clearInterval(dT);
+  document.getElementById('dc').classList.remove('sc');
+  document.getElementById('dh').textContent='✓ '+data.member.name;
+  document.getElementById('ds').textContent=`Matched · ${(data.confidence*100).toFixed(1)}% confidence`;
+  const m=data.member;
+  el.innerHTML=`<div class="mc">
+   <div style="display:flex;align-items:center;gap:11px;margin-bottom:10px">
+    <div class="av" style="background:var(--glt);color:var(--green)">${m.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
+    <div><div class="mn">${m.name}</div><div class="ms">${m.id}</div></div>
+    <span class="badge bgl" style="margin-left:auto">&#10003; Check-in</span>
+   </div>
+   <table class="it">
+    <tr><td>Plan</td><td>${m.plan}</td></tr><tr><td>Email</td><td>${m.email}</td></tr>
+    <tr><td>Time</td><td>${new Date().toLocaleTimeString()}</td></tr>
+    <tr><td>Confidence</td><td>${(data.confidence*100).toFixed(1)}%</td></tr>
+   </table></div>
+   <button class="btn bb" onclick="nextScan()">Scan next person</button>`;
+ }else{
+  document.getElementById('dh').textContent='No match — scanning';
+  document.getElementById('ds').textContent=data.message||'Scanning...';
+  el.innerHTML=data.confidence>0?`<div class="nc"><div class="mn">Not recognised</div><p>${data.message}</p></div>`:'';
+ }
+}
+
+function nextScan(){
+ document.getElementById('dr').innerHTML='';
+ document.getElementById('dh').textContent='Look at the camera';
+ document.getElementById('ds').textContent='Scanning — face the camera';
+ document.getElementById('dc').classList.add('sc');
+ dT=setInterval(runDet,2000);
+}
+
+function stopDet(){
+ clearInterval(dT);dS?.getTracks().forEach(t=>t.stop());dS=null;
+ document.getElementById('dcw').classList.add('hidden');
+ document.getElementById('bds').classList.remove('hidden');
+ document.getElementById('bdd').classList.add('hidden');
+ document.getElementById('ds').textContent='Camera off — press Start';
+ document.getElementById('dr').innerHTML='';
+}
+
+async function loadMem(){
+ const el=document.getElementById('ml');
+ try{
+  const d=await(await fetch(API+'/api/members')).json();
+  document.getElementById('mc').textContent=`(${d.count})`;
+  if(!d.members.length){el.innerHTML='<div style="color:var(--t3);font-size:13px;padding:12px 0;text-align:center">No members yet.</div>';return;}
+  el.innerHTML=d.members.map(m=>`
+   <div class="mr">
+    <div class="av">${m.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
+    <div style="flex:1;min-width:0"><div class="mn">${m.name}</div><div class="ms">${m.email} · ${m.phone}</div></div>
+    <span class="badge bl">${m.embedding_count} emb</span>
+   </div>`).join('');
+ }catch{el.innerHTML='<div style="color:var(--red);font-size:13px;padding:12px 0">Failed to load.</div>';}
+}
+
+async function loadLog(){
+ const el=document.getElementById('cl');
+ try{
+  const d=await(await fetch(API+'/api/checkins')).json();
+  if(!d.checkins.length){el.innerHTML='<div style="color:var(--t3);font-size:13px;padding:12px 0;text-align:center">No check-ins today.</div>';return;}
+  el.innerHTML=d.checkins.map(c=>`
+   <div class="cr">
+    <div class="av" style="width:32px;height:32px;font-size:11px">${c.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
+    <div style="flex:1"><div class="mn" style="font-size:13px">${c.name}</div><div class="ms">${c.plan||''}</div></div>
+    <span style="font-size:12px;color:var(--t3);white-space:nowrap">${new Date(c.checkin_at).toLocaleTimeString()}</span>
+    <span class="badge bgl">${(c.confidence*100).toFixed(0)}%</span>
+   </div>`).join('');
+ }catch{el.innerHTML='<div style="color:var(--red);font-size:13px;padding:12px 0">Failed to load.</div>';}
+}
+
+async function applyThr(){
+ const v=parseFloat(document.getElementById('tsl').value);
+ try{
+  const r=await fetch(API+'/api/threshold',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value:v})});
+  const d=await r.json();
+  if(d.success)document.getElementById('pr').innerHTML=`<div style="color:var(--green);font-size:13px;padding:6px 0">&#10003; Threshold set to ${v.toFixed(2)}</div>`;
+ }catch(e){alert('Error: '+e.message);}
+}
+
+async function probe(){
+ const v=document.getElementById('dv');
+ if(!v.srcObject||!v.readyState){document.getElementById('pr').innerHTML='<div style="color:var(--red);font-size:13px">Start the Check-in camera first, then probe.</div>';return;}
+ const c=document.createElement('canvas');c.width=320;c.height=320;
+ const ctx=c.getContext('2d');ctx.translate(320,0);ctx.scale(-1,1);ctx.drawImage(v,0,0,320,320);
+ try{
+  const res=await fetch(API+'/api/debug/probe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({frame:c.toDataURL('image/jpeg',0.88)})});
+  const data=await res.json();
+  if(!data.face_detected){document.getElementById('pr').innerHTML='<div style="color:var(--red);font-size:13px">No face detected in frame.</div>';return;}
+  const rows=data.scores.map(s=>`<tr><td style="padding:4px 8px 4px 0;font-size:13px">${s.name}</td><td style="padding:4px 0;font-size:13px;font-weight:600;color:${s.weighted>=data.current_threshold?'var(--green)':'var(--red)'}">${(s.weighted*100).toFixed(1)}%</td><td style="padding:4px 0 4px 8px;font-size:11px;color:var(--t3)">${s.n} emb</td></tr>`).join('');
+  const rec=data.recommended_threshold;
+  document.getElementById('pr').innerHTML=`
+   <div style="font-size:12px;color:var(--t3);margin-bottom:6px">Raw scores (threshold: ${data.current_threshold})</div>
+   <table style="width:100%">${rows}</table>
+   <div style="margin-top:10px;font-size:12px;color:var(--t2)">Recommended: <strong>${rec}</strong> (80% of your top score)</div>
+   <button class="btn bb" style="margin-top:8px" onclick="quickSet(${rec})">Apply ${rec}</button>`;
+ }catch(e){document.getElementById('pr').innerHTML='<div style="color:var(--red);font-size:13px">Probe failed: '+e.message+'</div>';}
+}
+
+async function quickSet(v){
+ document.getElementById('tsl').value=v;
+ document.getElementById('tv').textContent=parseFloat(v).toFixed(2);
+ await applyThr();
+}
+</script>
+</body>
+</html>
