@@ -4,7 +4,7 @@ from datetime import datetime, date
 from typing import Optional, Dict, List, Any
 
 log     = logging.getLogger("gymid.db")
-project_id = os.environ.get("RAILWAY_PROJECT_ID", "99ff68c1-32a7-49e9-8d53-1a0353fbd392")
+project_id = os.environ.get("RAILWAY_PROJECT_ID", "562acf8c-c0a6-41e8-b4d7-f37249b91679")
 volume_name = os.environ.get("RAILWAY_VOLUME_NAME", "vol_3cygu5nc1sov070u")
 mount_path = os.path.join("/var/lib/containers/railwayapp/bind-mounts", project_id, volume_name)
 DEFAULT_DB_PATH = os.path.join(mount_path, "gymid.db")
