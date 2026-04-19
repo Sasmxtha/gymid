@@ -4,7 +4,7 @@ from datetime import datetime, date
 from typing import Optional, Dict, List, Any
 
 log     = logging.getLogger("gymid.db")
-DEFAULT_DB_PATH = os.path.join(os.sep, "tmp", "gymid.db")
+DEFAULT_DB_PATH = os.path.join(os.sep, "data", "gymid.db")
 DB_PATH = os.environ.get("DB_PATH", "")
 if not DB_PATH or not DB_PATH.strip():
     DB_PATH = DEFAULT_DB_PATH
